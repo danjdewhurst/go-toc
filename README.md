@@ -1,36 +1,76 @@
-# go-toc
+<p align="center">
+  <h1 align="center">go-toc</h1>
+  <p align="center">
+    <strong>Blazing fast markdown table of contents generator</strong>
+  </p>
+  <p align="center">
+    Zero dependencies • Single binary • Powered by Go
+  </p>
+</p>
 
-A CLI tool for generating markdown table of contents from directory structures.
+<p align="center">
+  <a href="https://github.com/danjdewhurst/go-toc/releases"><img src="https://img.shields.io/github/v/release/danjdewhurst/go-toc?style=flat-square" alt="Release"></a>
+  <a href="https://github.com/danjdewhurst/go-toc/blob/main/LICENSE"><img src="https://img.shields.io/github/license/danjdewhurst/go-toc?style=flat-square" alt="License"></a>
+  <a href="https://goreportcard.com/report/github.com/danjdewhurst/go-toc"><img src="https://goreportcard.com/badge/github.com/danjdewhurst/go-toc?style=flat-square" alt="Go Report Card"></a>
+</p>
+
+---
+
+**go-toc** scans your project directories and generates beautiful, navigable table of contents in markdown format. Perfect for documentation sites, wikis, and project indexes.
+
+```
+├── api/
+│   ├── [handlers.md](api/handlers.md)
+│   │   > HTTP request handlers for the REST API endpoints...
+│   └── [routes.md](api/routes.md)
+│       > Route definitions and middleware configuration...
+└── [README.md](README.md)
+    > Main project documentation and overview...
+```
 
 ## Features
 
-- Recursively scans directories for markdown files (`.md`, `.markdown`)
-- Generates ASCII tree structure output in markdown format
-- Extracts first paragraph summaries from files
-- Supports `.gitignore` patterns
-- Configurable ignore patterns via glob syntax
-- Concurrent file processing with goroutines
-- Configurable recursion depth
-- Output to file or stdout
+- **Lightning fast** — Concurrent file processing with goroutines
+- **Smart filtering** — Respects `.gitignore` patterns out of the box
+- **Summary extraction** — Automatically pulls first paragraph from each file
+- **Flexible output** — ASCII tree or fancy emoji mode
+- **Zero config** — Sensible defaults, works instantly
+- **Single binary** — No runtime dependencies, just download and run
 
 ## Installation
 
-### From Releases
+### Download Binary
 
-Download the latest binary from the [releases page](https://github.com/danjdewhurst/go-toc/releases).
+Grab the latest release for your platform from the [releases page](https://github.com/danjdewhurst/go-toc/releases).
 
-### From Source
+### Go Install
 
 ```bash
 go install github.com/danjdewhurst/go-toc@latest
 ```
 
-### Build Locally
+### Build from Source
 
 ```bash
 git clone https://github.com/danjdewhurst/go-toc.git
 cd go-toc
 go build -o go-toc .
+```
+
+## Quick Start
+
+```bash
+# Generate TOC for current directory
+go-toc .
+
+# Include file summaries
+go-toc ./docs --summary
+
+# Fancy mode with emojis
+go-toc . --fancy --summary
+
+# Output to file
+go-toc . --summary --output toc.md
 ```
 
 ## Usage
@@ -39,56 +79,36 @@ go build -o go-toc .
 go-toc [directory] [flags]
 ```
 
+### Flags
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--summary` | `-s` | `false` | Include first paragraph summary for each file |
+| `--summary-chars` | `-c` | `100` | Maximum characters for summary |
+| `--fancy` | `-f` | `false` | Use emoji icons instead of ASCII tree |
+| `--gitignore` | `-g` | `false` | Respect `.gitignore` patterns |
+| `--ignore` | `-i` | `[]` | Additional glob patterns to ignore |
+| `--max-depth` | `-d` | `0` | Maximum recursion depth (0 = unlimited) |
+| `--output` | `-o` | stdout | Output file path |
+| `--title` | `-t` | `"Table of Contents"` | Custom title |
+| `--single-threaded` | | `false` | Disable concurrent processing |
+
 ### Examples
 
 ```bash
-# Scan current directory
-go-toc .
+# Limit depth and ignore vendor
+go-toc . --max-depth 2 --ignore "vendor/*"
 
-# Scan specific directory with summaries
-go-toc ./docs --summary
-
-# Limit recursion depth
-go-toc . --max-depth 2
-
-# Ignore patterns
-go-toc . --ignore "vendor/*" --ignore "*.tmp"
-
-# Include .gitignore patterns
-go-toc . --gitignore
-
-# Output to file
-go-toc . --summary --output toc.md
+# Full featured run
+go-toc ./docs -s -c 150 -d 3 -g -o docs-toc.md
 
 # Custom title
 go-toc . --title "Documentation Index"
-
-# Fancy mode with emojis
-go-toc . --fancy --summary
-
-# Combine options
-go-toc ./docs -s -c 150 -d 3 -g -o docs-toc.md
 ```
 
-### Flags
+## Output Formats
 
-| Flag | Short | Type | Default | Description |
-|------|-------|------|---------|-------------|
-| `--ignore` | `-i` | string[] | `[]` | Glob patterns to ignore (can be specified multiple times) |
-| `--gitignore` | `-g` | bool | `false` | Include `.gitignore` patterns |
-| `--max-depth` | `-d` | int | `0` | Maximum recursion depth (0 = unlimited) |
-| `--summary` | `-s` | bool | `false` | Include first paragraph summary for each file |
-| `--summary-chars` | `-c` | int | `100` | Maximum characters for summary |
-| `--single-threaded` | | bool | `false` | Disable concurrent processing |
-| `--output` | `-o` | string | `""` | Output file (default: stdout) |
-| `--title` | `-t` | string | `"Table of Contents"` | Title for the table of contents |
-| `--fancy` | `-f` | bool | `false` | Use emoji icons instead of ASCII tree |
-| `--version` | `-v` | | | Show version |
-| `--help` | `-h` | | | Show help |
-
-## Output Format
-
-The tool generates an ASCII tree structure:
+### ASCII Tree (default)
 
 ```markdown
 # Table of Contents
@@ -98,14 +118,11 @@ The tool generates an ASCII tree structure:
 │   │   > HTTP request handlers for the REST API endpoints...
 │   └── [routes.md](api/routes.md)
 │       > Route definitions and middleware configuration...
-├── docs/
-│   └── [getting-started.md](docs/getting-started.md)
-│       > Quick guide to get up and running with the project...
 └── [README.md](README.md)
-    > Main project documentation and overview of features...
+    > Main project documentation and overview...
 ```
 
-With `--fancy` flag, it uses emojis instead:
+### Fancy Mode (`--fancy`)
 
 ```markdown
 # Table of Contents 📚
@@ -115,56 +132,42 @@ With `--fancy` flag, it uses emojis instead:
     > 💬 HTTP request handlers for the REST API endpoints...
   - 📄 [routes.md](api/routes.md)
     > 💬 Route definitions and middleware configuration...
-- 📁 **docs/**
-  - 📄 [getting-started.md](docs/getting-started.md)
-    > 💬 Quick guide to get up and running with the project...
 - 📄 [README.md](README.md)
-  > 💬 Main project documentation and overview of features...
+  > 💬 Main project documentation and overview...
 ```
 
 ## How It Works
 
-1. **Scanning**: Recursively walks the directory tree, identifying markdown files
-2. **Filtering**: Applies ignore patterns and `.gitignore` rules
-3. **Parsing**: Extracts summaries from markdown files (skipping YAML frontmatter)
-4. **Generation**: Builds the tree structure and outputs as markdown
+1. **Scan** — Recursively walks directory tree, identifying markdown files
+2. **Filter** — Applies ignore patterns and `.gitignore` rules
+3. **Parse** — Extracts summaries (skipping frontmatter and headings)
+4. **Generate** — Builds tree structure and outputs markdown
 
-### Summary Extraction
-
-When `--summary` is enabled, the tool:
-
-- Skips YAML frontmatter (content between `---` delimiters)
-- Skips headings, list items, and code blocks
-- Extracts the first paragraph of actual content
+Summary extraction intelligently:
+- Skips YAML frontmatter between `---` delimiters
+- Ignores headings, list items, and code blocks
 - Strips markdown formatting (bold, italic, links)
-- Truncates to the specified character limit
+- Truncates to configured character limit
 
 ## Development
 
-### Prerequisites
-
-- Go 1.21+
-
-### Running Tests
-
 ```bash
+# Run tests
 go test ./...
-```
 
-### Building
+# Run tests with coverage
+go test ./... -cover
 
-```bash
-go build -o go-toc .
-```
-
-### Linting
-
-```bash
+# Lint
 golangci-lint run
 ```
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE) for details.
 
-Copyright (c) 2026 Daniel Dewhurst
+---
+
+<p align="center">
+  Made by <a href="https://github.com/danjdewhurst">Daniel Dewhurst</a>
+</p>
