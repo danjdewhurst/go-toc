@@ -33,6 +33,7 @@
 - **Lightning fast** — Concurrent file processing with goroutines
 - **Smart filtering** — Respects `.gitignore` patterns out of the box
 - **Summary extraction** — Automatically pulls first paragraph from each file
+- **AI agent friendly** — Perfect context file for LLM coding assistants
 - **Flexible output** — ASCII tree or fancy emoji mode
 - **Zero config** — Sensible defaults, works instantly
 - **Single binary** — No runtime dependencies, just download and run
@@ -135,6 +136,17 @@ go-toc . --title "Documentation Index"
 - 📄 [README.md](README.md)
   > 💬 Main project documentation and overview...
 ```
+
+## AI Agent Context
+
+The generated TOC is ideal for providing context to AI coding agents. Instead of searching through directories and reading unnecessary files, an agent can read a single TOC file to understand what documentation exists and where to find relevant information — saving context window space and reducing hallucination.
+
+```bash
+# Generate a docs map for your AI agent
+go-toc ./docs --summary --output docs-toc.md
+```
+
+Include the output file in your agent's context or system prompt, and it can navigate directly to the files it needs.
 
 ## How It Works
 
