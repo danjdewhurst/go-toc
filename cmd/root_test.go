@@ -190,7 +190,7 @@ func TestGitignoreFlag(t *testing.T) {
 	rootCmd.SetOut(&stdout1)
 	rootCmd.SetErr(&stdout1)
 	rootCmd.SetArgs([]string{tmpDir})
-	rootCmd.Execute()
+	_ = rootCmd.Execute()
 
 	// With gitignore flag - should exclude ignored dir
 	resetFlags()
@@ -198,7 +198,7 @@ func TestGitignoreFlag(t *testing.T) {
 	rootCmd.SetOut(&stdout2)
 	rootCmd.SetErr(&stdout2)
 	rootCmd.SetArgs([]string{tmpDir, "--gitignore"})
-	rootCmd.Execute()
+	_ = rootCmd.Execute()
 
 	if !strings.Contains(stdout1.String(), "secret.md") {
 		t.Error("without --gitignore, ignored files should be included")
@@ -215,7 +215,7 @@ func TestDefaultDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	tmpDir := setupTestDir(t)
 	defer os.RemoveAll(tmpDir)

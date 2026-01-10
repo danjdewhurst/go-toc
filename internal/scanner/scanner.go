@@ -204,7 +204,7 @@ func (s *Scanner) shouldIgnore(relPath string, isDir bool) bool {
 func (s *Scanner) containsMarkdown(dirPath string) bool {
 	hasMarkdown := false
 
-	filepath.WalkDir(dirPath, func(path string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(dirPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
