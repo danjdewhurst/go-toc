@@ -81,6 +81,69 @@ func TestGeneratorDirectories(t *testing.T) {
 	}
 }
 
+func TestGeneratorFancy(t *testing.T) {
+	tree := NewTree("project")
+	tree.AddFile("README.md")
+	tree.AddFile("docs/guide.md")
+	tree.Sort()
+
+	gen := NewGenerator(GeneratorConfig{
+		Title: "Test ToC",
+		Fancy: true,
+	})
+
+	output := gen.Generate(tree)
+
+	// Check title has emoji
+	if !strings.Contains(output, "# Test ToC 📚") {
+		t.Error("fancy output should contain title with emoji")
+	}
+
+	// Check folder emoji
+	if !strings.Contains(output, "📁") {
+		t.Error("fancy output should contain folder emoji")
+	}
+
+	// Check file emoji
+	if !strings.Contains(output, "📄") {
+		t.Error("fancy output should contain file emoji")
+	}
+
+	// Check file links still work
+	if !strings.Contains(output, "[README.md](README.md)") {
+		t.Error("fancy output should contain README link")
+	}
+
+	// Should NOT contain ASCII tree characters
+	if strings.Contains(output, "├──") || strings.Contains(output, "└──") {
+		t.Error("fancy output should not contain ASCII tree characters")
+	}
+}
+
+func TestGeneratorFancyWithSummary(t *testing.T) {
+	tree := NewTree("project")
+	tree.AddFile("README.md")
+	tree.Sort()
+
+	summaries := map[string]string{
+		"README.md": "This is the project overview.",
+	}
+
+	gen := NewGenerator(GeneratorConfig{
+		Title:          "Test ToC",
+		Fancy:          true,
+		IncludeSummary: true,
+		Summaries:      summaries,
+	})
+
+	output := gen.Generate(tree)
+
+	// Check summary has speech bubble emoji
+	if !strings.Contains(output, "> 💬 This is the project overview.") {
+		t.Error("fancy output should contain summary with emoji")
+	}
+}
+
 func TestGetStats(t *testing.T) {
 	tree := NewTree("project")
 	tree.AddFile("README.md")

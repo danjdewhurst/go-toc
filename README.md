@@ -63,6 +63,9 @@ go-toc . --summary --output toc.md
 # Custom title
 go-toc . --title "Documentation Index"
 
+# Fancy mode with emojis
+go-toc . --fancy --summary
+
 # Combine options
 go-toc ./docs -s -c 150 -d 3 -g -o docs-toc.md
 ```
@@ -79,6 +82,7 @@ go-toc ./docs -s -c 150 -d 3 -g -o docs-toc.md
 | `--single-threaded` | | bool | `false` | Disable concurrent processing |
 | `--output` | `-o` | string | `""` | Output file (default: stdout) |
 | `--title` | `-t` | string | `"Table of Contents"` | Title for the table of contents |
+| `--fancy` | `-f` | bool | `false` | Use emoji icons instead of ASCII tree |
 | `--version` | `-v` | | | Show version |
 | `--help` | `-h` | | | Show help |
 
@@ -99,6 +103,23 @@ The tool generates an ASCII tree structure:
 │       > Quick guide to get up and running with the project...
 └── [README.md](README.md)
     > Main project documentation and overview of features...
+```
+
+With `--fancy` flag, it uses emojis instead:
+
+```markdown
+# Table of Contents 📚
+
+- 📁 **api/**
+  - 📄 [handlers.md](api/handlers.md)
+    > 💬 HTTP request handlers for the REST API endpoints...
+  - 📄 [routes.md](api/routes.md)
+    > 💬 Route definitions and middleware configuration...
+- 📁 **docs/**
+  - 📄 [getting-started.md](docs/getting-started.md)
+    > 💬 Quick guide to get up and running with the project...
+- 📄 [README.md](README.md)
+  > 💬 Main project documentation and overview of features...
 ```
 
 ## How It Works

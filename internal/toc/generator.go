@@ -6,18 +6,24 @@ import (
 )
 
 const (
+	// ASCII tree characters
 	treeVertical   = "│"
 	treeBranch     = "├──"
 	treeLastBranch = "└──"
 	treeSpace      = "    "
 	treePipe       = "│   "
+
+	// Fancy emoji characters
+	emojiFolder = "📁"
+	emojiFile   = "📄"
 )
 
 // GeneratorConfig holds options for ToC generation.
 type GeneratorConfig struct {
-	Title          string // Title for the ToC
-	IncludeSummary bool   // Whether to include file summaries
+	Title          string            // Title for the ToC
+	IncludeSummary bool              // Whether to include file summaries
 	Summaries      map[string]string // Map of file path to summary
+	Fancy          bool              // Use emoji icons instead of ASCII tree
 }
 
 // Generator creates markdown table of contents output.
@@ -41,6 +47,14 @@ func NewGenerator(config GeneratorConfig) *Generator {
 
 // Generate creates the markdown ToC from a tree.
 func (g *Generator) Generate(tree *Tree) string {
+	if g.config.Fancy {
+		return g.generateFancy(tree)
+	}
+	return g.generateASCII(tree)
+}
+
+// generateASCII creates ASCII tree style output.
+func (g *Generator) generateASCII(tree *Tree) string {
 	var sb strings.Builder
 
 	// Write title
@@ -119,6 +133,58 @@ func (g *Generator) Generate(tree *Tree) string {
 				prefixes = append(prefixes, treeSpace)
 			} else {
 				prefixes = append(prefixes, treePipe)
+			}
+		}
+	})
+
+	return sb.String()
+}
+
+// generateFancy creates emoji-based output.
+func (g *Generator) generateFancy(tree *Tree) string {
+	var sb strings.Builder
+
+	// Write title with emoji
+	sb.WriteString("# ")
+	sb.WriteString(g.config.Title)
+	sb.WriteString(" 📚\n\n")
+
+	tree.Walk(func(node *Node, depth int, isLast bool) {
+		// Indent based on depth
+		indent := strings.Repeat("  ", depth)
+
+		sb.WriteString(indent)
+
+		if node.IsDir {
+			// Directory with folder emoji
+			sb.WriteString("- ")
+			sb.WriteString(emojiFolder)
+			sb.WriteString(" **")
+			sb.WriteString(node.Name)
+			sb.WriteString("/**\n")
+		} else {
+			// File with document emoji
+			sb.WriteString("- ")
+			sb.WriteString(emojiFile)
+			sb.WriteString(" [")
+			sb.WriteString(node.Name)
+			sb.WriteString("](")
+			sb.WriteString(node.Path)
+			sb.WriteString(")\n")
+
+			// Add summary if enabled
+			if g.config.IncludeSummary {
+				summary := node.Summary
+				if summary == "" {
+					summary = g.config.Summaries[node.Path]
+				}
+
+				if summary != "" {
+					sb.WriteString(indent)
+					sb.WriteString("  > 💬 ")
+					sb.WriteString(summary)
+					sb.WriteString("\n")
+				}
 			}
 		}
 	})

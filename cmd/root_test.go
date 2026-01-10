@@ -281,4 +281,5 @@ func resetFlags() {
 	singleThreaded = false
 	outputFile = ""
 	title = "Table of Contents"
+	fancy = false
 }

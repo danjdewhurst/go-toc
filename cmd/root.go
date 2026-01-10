@@ -26,6 +26,7 @@ var (
 	singleThreaded bool
 	outputFile     string
 	title          string
+	fancy          bool
 )
 
 // rootCmd represents the base command.
@@ -59,6 +60,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&singleThreaded, "single-threaded", false, "disable concurrent processing")
 	rootCmd.Flags().StringVarP(&outputFile, "output", "o", "", "output file (default: stdout)")
 	rootCmd.Flags().StringVarP(&title, "title", "t", "Table of Contents", "title for the table of contents")
+	rootCmd.Flags().BoolVarP(&fancy, "fancy", "f", false, "use emoji icons instead of ASCII tree")
 
 	rootCmd.Version = Version
 }
@@ -117,6 +119,7 @@ func runToc(cmd *cobra.Command, args []string) error {
 		Title:          title,
 		IncludeSummary: includeSummary,
 		Summaries:      summaries,
+		Fancy:          fancy,
 	}
 
 	gen := toc.NewGenerator(genConfig)
