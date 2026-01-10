@@ -42,7 +42,29 @@
 
 ### Download Binary
 
-Grab the latest release for your platform from the [releases page](https://github.com/danjdewhurst/go-toc/releases).
+```bash
+# macOS (Apple Silicon)
+curl -sL https://github.com/danjdewhurst/go-toc/releases/latest/download/go-toc_darwin_arm64.tar.gz | tar xz
+sudo mv go-toc /usr/local/bin/
+
+# macOS (Intel)
+curl -sL https://github.com/danjdewhurst/go-toc/releases/latest/download/go-toc_darwin_amd64.tar.gz | tar xz
+sudo mv go-toc /usr/local/bin/
+
+# Linux (x86_64)
+curl -sL https://github.com/danjdewhurst/go-toc/releases/latest/download/go-toc_linux_amd64.tar.gz | tar xz
+sudo mv go-toc /usr/local/bin/
+
+# Linux (ARM64)
+curl -sL https://github.com/danjdewhurst/go-toc/releases/latest/download/go-toc_linux_arm64.tar.gz | tar xz
+sudo mv go-toc /usr/local/bin/
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri https://github.com/danjdewhurst/go-toc/releases/latest/download/go-toc_windows_amd64.zip -OutFile go-toc.zip
+Expand-Archive go-toc.zip -DestinationPath .
+```
+
+Or grab from the [releases page](https://github.com/danjdewhurst/go-toc/releases).
 
 ### Go Install
 
