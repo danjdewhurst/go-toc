@@ -197,53 +197,6 @@ func (g *Generator) generateFancy(tree *Tree) string {
 	return sb.String()
 }
 
-// GenerateSimple creates a simple bullet list ToC (alternative format).
-func (g *Generator) GenerateSimple(tree *Tree) string {
-	var sb strings.Builder
-
-	// Write title
-	sb.WriteString("# ")
-	sb.WriteString(g.config.Title)
-	sb.WriteString("\n\n")
-
-	tree.Walk(func(node *Node, depth int, isLast bool) {
-		// Indent based on depth
-		indent := strings.Repeat("  ", depth)
-
-		sb.WriteString(indent)
-		sb.WriteString("- ")
-
-		if node.IsDir {
-			sb.WriteString("**")
-			sb.WriteString(node.Name)
-			sb.WriteString("/**\n")
-		} else {
-			sb.WriteString("[")
-			sb.WriteString(node.Name)
-			sb.WriteString("](")
-			sb.WriteString(node.Path)
-			sb.WriteString(")\n")
-
-			// Add summary if enabled
-			if g.config.IncludeSummary {
-				summary := node.Summary
-				if summary == "" {
-					summary = g.config.Summaries[node.Path]
-				}
-
-				if summary != "" {
-					sb.WriteString(indent)
-					sb.WriteString("  > ")
-					sb.WriteString(summary)
-					sb.WriteString("\n")
-				}
-			}
-		}
-	})
-
-	return sb.String()
-}
-
 // SetSummary adds a summary for a specific file path.
 func (g *Generator) SetSummary(path, summary string) {
 	g.config.Summaries[path] = summary
