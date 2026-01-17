@@ -19,10 +19,11 @@ const (
 
 // GeneratorConfig holds options for ToC generation.
 type GeneratorConfig struct {
-	Title          string            // Title for the ToC
-	IncludeSummary bool              // Whether to include file summaries
-	Summaries      map[string]string // Map of file path to summary
-	Fancy          bool              // Use emoji icons instead of ASCII tree
+	Title           string            // Title for the ToC
+	IncludeSummary  bool              // Whether to include file summaries
+	Summaries       map[string]string // Map of file path to summary
+	Fancy           bool              // Use emoji icons instead of ASCII tree
+	GenerateAnchors bool              // Add anchor IDs to entries for linking
 }
 
 // Generator creates markdown table of contents output.
@@ -78,9 +79,15 @@ func (g *Generator) generateASCII(tree *Tree) string {
 		sb.WriteString(linePrefix)
 
 		if node.IsDir {
+			if g.config.GenerateAnchors {
+				fmt.Fprintf(&sb, "<a id=\"%s\"></a>", generateSlug(node.Path))
+			}
 			sb.WriteString(node.Name)
 			sb.WriteString("/\n")
 		} else {
+			if g.config.GenerateAnchors {
+				fmt.Fprintf(&sb, "<a id=\"%s\"></a>", generateSlug(node.Path))
+			}
 			fmt.Fprintf(&sb, "[%s](%s)\n", node.Name, node.Path)
 
 			// Add summary if enabled
@@ -163,6 +170,9 @@ func (g *Generator) generateFancy(tree *Tree) string {
 		if node.IsDir {
 			// Directory with folder emoji
 			sb.WriteString("- ")
+			if g.config.GenerateAnchors {
+				fmt.Fprintf(&sb, "<a id=\"%s\"></a>", generateSlug(node.Path))
+			}
 			sb.WriteString(emojiFolder)
 			sb.WriteString(" **")
 			sb.WriteString(node.Name)
@@ -170,6 +180,9 @@ func (g *Generator) generateFancy(tree *Tree) string {
 		} else {
 			// File with document emoji
 			sb.WriteString("- ")
+			if g.config.GenerateAnchors {
+				fmt.Fprintf(&sb, "<a id=\"%s\"></a>", generateSlug(node.Path))
+			}
 			sb.WriteString(emojiFile)
 			sb.WriteString(" [")
 			sb.WriteString(node.Name)
@@ -246,4 +259,41 @@ func GetStats(tree *Tree) Stats {
 func FormatStats(stats Stats) string {
 	return fmt.Sprintf("%d files, %d directories, max depth %d",
 		stats.TotalFiles, stats.TotalDirectories, stats.MaxDepth)
+}
+
+// generateSlug creates a GitHub-style anchor slug from a path.
+// For example: "docs/API Guide.md" -> "docs-api-guide"
+func generateSlug(path string) string {
+	// Remove file extension
+	if idx := strings.LastIndex(path, "."); idx != -1 {
+		path = path[:idx]
+	}
+
+	var result strings.Builder
+	result.Grow(len(path))
+
+	prevDash := false
+	for _, r := range strings.ToLower(path) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			result.WriteRune(r)
+			prevDash = false
+		case r == '-':
+			if !prevDash && result.Len() > 0 {
+				result.WriteRune('-')
+				prevDash = true
+			}
+		case r == ' ', r == '/', r == '_', r == '.':
+			// Convert separators to dashes
+			if !prevDash && result.Len() > 0 {
+				result.WriteRune('-')
+				prevDash = true
+			}
+		}
+		// Skip other characters
+	}
+
+	// Trim trailing dash
+	s := result.String()
+	return strings.TrimSuffix(s, "-")
 }

@@ -177,3 +177,48 @@ func TestFormatStats(t *testing.T) {
 		t.Errorf("unexpected output: %s", output)
 	}
 }
+
+func TestGeneratorWithAnchors(t *testing.T) {
+	tree := NewTree("project")
+	tree.AddFile("README.md")
+	tree.AddFile("docs/API Guide.md")
+	tree.Sort()
+
+	gen := NewGenerator(GeneratorConfig{
+		Title:           "Test ToC",
+		GenerateAnchors: true,
+	})
+
+	output := gen.Generate(tree)
+
+	// Check anchors are generated
+	if !strings.Contains(output, `<a id="readme"></a>`) {
+		t.Error("output should contain anchor for README")
+	}
+	if !strings.Contains(output, `<a id="docs-api-guide"></a>`) {
+		t.Error("output should contain anchor for docs/API Guide.md")
+	}
+}
+
+func TestGenerateSlug(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"README.md", "readme"},
+		{"docs/guide.md", "docs-guide"},
+		{"docs/API Guide.md", "docs-api-guide"},
+		{"my_file.md", "my-file"},
+		{"path/to/file.md", "path-to-file"},
+		{"UPPERCASE.md", "uppercase"},
+		{"file-with-dashes.md", "file-with-dashes"},
+		{"file...dots.md", "file-dots"},
+	}
+
+	for _, tt := range tests {
+		result := generateSlug(tt.input)
+		if result != tt.expected {
+			t.Errorf("generateSlug(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
