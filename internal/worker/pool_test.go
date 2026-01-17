@@ -212,3 +212,30 @@ type testError struct {
 func (e *testError) Error() string {
 	return e.msg
 }
+
+func TestPoolDoubleClose(t *testing.T) {
+	processFunc := func(job Job) Result {
+		return Result{FilePath: job.FilePath, Summary: "done"}
+	}
+
+	pool := NewPool(2, processFunc)
+	pool.Start()
+
+	// Submit job and close properly via Close()
+	go func() {
+		pool.Submit(Job{FilePath: "test.md"})
+	}()
+
+	// Give time for job to be submitted
+	time.Sleep(10 * time.Millisecond)
+
+	// This should not panic due to double close
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Close() panicked on double close: %v", r)
+		}
+	}()
+
+	pool.Close()
+	pool.Close() // Second close should be safe
+}

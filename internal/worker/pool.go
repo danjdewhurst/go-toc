@@ -22,11 +22,12 @@ type ProcessFunc func(job Job) Result
 
 // Pool manages a pool of worker goroutines.
 type Pool struct {
-	workers    int
-	jobs       chan Job
-	results    chan Result
-	wg         sync.WaitGroup
+	workers     int
+	jobs        chan Job
+	results     chan Result
+	wg          sync.WaitGroup
 	processFunc ProcessFunc
+	closeOnce   sync.Once
 }
 
 // NewPool creates a new worker pool with the specified number of workers.
@@ -67,10 +68,13 @@ func (p *Pool) Submit(job Job) {
 }
 
 // Close signals that no more jobs will be submitted and waits for completion.
+// Safe to call multiple times.
 func (p *Pool) Close() {
-	close(p.jobs)
-	p.wg.Wait()
-	close(p.results)
+	p.closeOnce.Do(func() {
+		close(p.jobs)
+		p.wg.Wait()
+		close(p.results)
+	})
 }
 
 // Results returns the results channel for reading.
@@ -88,7 +92,7 @@ func ProcessAll(jobs []Job, workers int, processFunc ProcessFunc) map[string]Res
 	pool := NewPool(workers, processFunc)
 	pool.Start()
 
-	// Submit all jobs
+	// Submit all jobs in a goroutine
 	go func() {
 		for _, job := range jobs {
 			pool.Submit(job)
@@ -96,22 +100,18 @@ func ProcessAll(jobs []Job, workers int, processFunc ProcessFunc) map[string]Res
 		close(pool.jobs)
 	}()
 
-	// Collect results
-	results := make(map[string]Result)
-	var wg sync.WaitGroup
-
-	wg.Add(1)
+	// Wait for workers to finish, then close results channel
 	go func() {
-		defer wg.Done()
 		pool.wg.Wait()
 		close(pool.results)
 	}()
 
+	// Collect results - loop exits when results channel is closed
+	results := make(map[string]Result)
 	for result := range pool.results {
 		results[result.FilePath] = result
 	}
 
-	wg.Wait()
 	return results
 }
 
