@@ -222,13 +222,8 @@ func TestPoolDoubleClose(t *testing.T) {
 	pool := NewPool(2, processFunc)
 	pool.Start()
 
-	// Submit job and close properly via Close()
-	go func() {
-		pool.Submit(Job{FilePath: "test.md"})
-	}()
-
-	// Give time for job to be submitted
-	time.Sleep(10 * time.Millisecond)
+	// Submit job synchronously before closing
+	pool.Submit(Job{FilePath: "test.md"})
 
 	// This should not panic due to double close
 	defer func() {
