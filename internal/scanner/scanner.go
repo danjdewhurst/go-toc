@@ -94,6 +94,11 @@ func (s *Scanner) ScanWithFiles() (*ScanResult, error) {
 			return nil
 		}
 
+		// Load nested .gitignore files as we traverse
+		if d.IsDir() && s.gitignoreMgr != nil {
+			s.gitignoreMgr.LoadGitignoreForDir(path)
+		}
+
 		// Check if path should be ignored
 		if s.shouldIgnore(relPath, d.IsDir()) {
 			if d.IsDir() {

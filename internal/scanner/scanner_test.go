@@ -453,3 +453,53 @@ func TestContainsMarkdown(t *testing.T) {
 		t.Error("empty should not contain markdown")
 	}
 }
+
+func TestScannerNestedGitignore(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "go-toc-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create root .gitignore that ignores *.log files
+	createTestFile(t, tmpDir, ".gitignore", "*.log")
+
+	// Create a subdirectory with its own .gitignore
+	createTestDir(t, tmpDir, "subdir")
+	createTestFile(t, tmpDir, "subdir/.gitignore", "ignored.md")
+
+	// Create test files
+	createTestFile(t, tmpDir, "README.md", "# Root readme")
+	createTestFile(t, tmpDir, "subdir/included.md", "# Included")
+	createTestFile(t, tmpDir, "subdir/ignored.md", "# Should be ignored by nested gitignore")
+
+	config := Config{
+		RootPath:     tmpDir,
+		UseGitignore: true,
+	}
+
+	s := New(config)
+	result, err := s.ScanWithFiles()
+	if err != nil {
+		t.Fatalf("scan failed: %v", err)
+	}
+
+	// Check that ignored.md was not included
+	for _, f := range result.Files {
+		if filepath.Base(f) == "ignored.md" {
+			t.Error("ignored.md should have been filtered by nested .gitignore")
+		}
+	}
+
+	// Check that included.md was included
+	foundIncluded := false
+	for _, f := range result.Files {
+		if filepath.Base(f) == "included.md" {
+			foundIncluded = true
+			break
+		}
+	}
+	if !foundIncluded {
+		t.Error("included.md should have been found")
+	}
+}
