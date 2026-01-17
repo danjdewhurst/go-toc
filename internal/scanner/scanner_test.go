@@ -158,11 +158,38 @@ func TestMatchDoublestar(t *testing.T) {
 		path     string
 		expected bool
 	}{
+		// Basic patterns
 		{"**/*.md", "docs/file.md", true},
 		{"**/*.md", "file.md", true},
-		{"vendor/**", "vendor/lib/file.go", true},
-		{"docs/**/*.md", "docs/api/ref.md", true},
+		{"**/*.md", "a/b/c/file.md", true},
 		{"**/*.go", "file.md", false},
+
+		// Prefix patterns
+		{"vendor/**", "vendor/lib/file.go", true},
+		{"vendor/**", "vendor/file.go", true},
+		{"vendor/**", "other/file.go", false},
+		{"docs/**", "docs", false}, // ** requires at least one segment after
+
+		// Combined prefix and suffix
+		{"docs/**/*.md", "docs/api/ref.md", true},
+		{"docs/**/*.md", "docs/api/v2/ref.md", true},
+		{"docs/**/*.md", "docs/ref.md", true},
+		{"docs/**/*.md", "docs/api/ref.go", false},
+		{"docs/**/*.md", "other/api/ref.md", false},
+
+		// Multiple directory levels
+		{"src/**/*.go", "src/pkg/internal/file.go", true},
+		{"**/test/**", "foo/test/bar", true},
+		{"**/test/**", "test/bar", true},
+
+		// Edge cases
+		{"**", "anything/at/all", true},
+		{"**", "file.txt", true},
+		{"*.md", "file.md", true}, // No **, falls back to regular glob
+		{"*.md", "dir/file.md", false},
+
+		// Prefix boundary check
+		{"docs/**", "documentation/file.md", false}, // "docs" is not a prefix of "documentation"
 	}
 
 	for _, tt := range tests {

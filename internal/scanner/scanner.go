@@ -214,38 +214,69 @@ func isMarkdownFile(path string) bool {
 }
 
 // matchDoublestar handles ** glob patterns.
+// Supports patterns like: **/*.md, docs/**, docs/**/*.md, **/test/**
 func matchDoublestar(pattern, path string) bool {
-	// Simple implementation for common cases
-	parts := strings.Split(pattern, "**")
-	if len(parts) != 2 {
-		return false
-	}
+	return matchDoublestarRecursive(pattern, path)
+}
 
-	prefix := strings.TrimSuffix(parts[0], "/")
-	suffix := strings.TrimPrefix(parts[1], "/")
-
-	// Check prefix
-	if prefix != "" && !strings.HasPrefix(path, prefix) {
-		return false
-	}
-
-	// Check suffix
-	if suffix != "" {
-		remaining := path
-		if prefix != "" {
-			remaining = strings.TrimPrefix(path, prefix)
-			remaining = strings.TrimPrefix(remaining, "/")
-		}
-
-		// Match suffix against the remaining path or any subpath
-		if strings.HasSuffix(remaining, suffix) {
-			return true
-		}
-
-		// Check if suffix matches filename
-		matched, _ := filepath.Match(suffix, filepath.Base(path))
+// matchDoublestarRecursive implements recursive doublestar matching.
+func matchDoublestarRecursive(pattern, path string) bool {
+	// Find the first ** in the pattern
+	idx := strings.Index(pattern, "**")
+	if idx == -1 {
+		// No **, use regular glob matching
+		matched, _ := filepath.Match(pattern, path)
 		return matched
 	}
 
-	return true
+	// Split pattern into before and after **
+	before := pattern[:idx]
+	after := pattern[idx+2:]
+
+	// Remove leading/trailing slashes from after
+	after = strings.TrimPrefix(after, "/")
+
+	// Check that the path starts with the prefix (before **)
+	if before != "" {
+		before = strings.TrimSuffix(before, "/")
+		if before != "" {
+			if !strings.HasPrefix(path, before) {
+				return false
+			}
+			// Check that prefix is followed by / or is exact match
+			rest := path[len(before):]
+			if rest == "" {
+				// Path equals prefix exactly - only match if pattern is prefix/**
+				// and there's no suffix, meaning we need something after the prefix
+				// For "docs/**" matching "docs", we return false because docs is not inside docs/
+				return false
+			}
+			if !strings.HasPrefix(rest, "/") {
+				return false
+			}
+			path = strings.TrimPrefix(rest, "/")
+		}
+	}
+
+	// If path is empty after prefix stripping, ** matches nothing
+	if path == "" {
+		return after == ""
+	}
+
+	// If no suffix pattern after **, match everything
+	if after == "" {
+		return true
+	}
+
+	// ** can match zero or more path segments
+	// Try matching the suffix at each possible position
+	pathParts := strings.Split(path, "/")
+	for i := 0; i <= len(pathParts); i++ {
+		remaining := strings.Join(pathParts[i:], "/")
+		if matchDoublestarRecursive(after, remaining) {
+			return true
+		}
+	}
+
+	return false
 }
