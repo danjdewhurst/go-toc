@@ -245,6 +245,7 @@ func removeImagesSyntax(text string) string {
 }
 
 // findMatchingBracket finds the matching closing bracket.
+// Handles escaped characters (e.g., \] is not treated as closing bracket).
 func findMatchingBracket(text string, start int, open, close byte) int {
 	if start >= len(text) || text[start] != open {
 		return -1
@@ -252,6 +253,12 @@ func findMatchingBracket(text string, start int, open, close byte) int {
 
 	count := 1
 	for i := start + 1; i < len(text); i++ {
+		// Skip escaped characters
+		if text[i] == '\\' && i+1 < len(text) {
+			i++ // Skip next character
+			continue
+		}
+
 		if text[i] == open {
 			count++
 		} else if text[i] == close {

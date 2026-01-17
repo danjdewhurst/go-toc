@@ -145,3 +145,57 @@ func TestIsHorizontalRule(t *testing.T) {
 		}
 	}
 }
+
+func TestFindMatchingBracketWithEscapes(t *testing.T) {
+	tests := []struct {
+		text     string
+		start    int
+		open     byte
+		close    byte
+		expected int
+	}{
+		// Normal case
+		{"[text]", 0, '[', ']', 5},
+		// Escaped closing bracket should be skipped
+		{`[text with \] bracket]`, 0, '[', ']', 21},
+		// Escaped open bracket should be skipped
+		{`[\[ nested]`, 0, '[', ']', 10},
+		// Parentheses
+		{"(url)", 0, '(', ')', 4},
+		// Escaped in URL
+		{`(path/to/file\))`, 0, '(', ')', 15},
+		// No match
+		{"[unclosed", 0, '[', ']', -1},
+		// Nested brackets
+		{"[outer [inner] more]", 0, '[', ']', 19},
+	}
+
+	for _, tt := range tests {
+		result := findMatchingBracket(tt.text, tt.start, tt.open, tt.close)
+		if result != tt.expected {
+			t.Errorf("findMatchingBracket(%q, %d, '%c', '%c'): expected %d, got %d",
+				tt.text, tt.start, tt.open, tt.close, tt.expected, result)
+		}
+	}
+}
+
+func TestRemoveLinksSyntaxWithEscapes(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		// Normal link
+		{"[text](url)", "text"},
+		// Escaped bracket in text - should handle the escape
+		{`[text with \] bracket](url)`, `text with \] bracket`},
+		// Multiple links
+		{"[a](1) and [b](2)", "a and b"},
+	}
+
+	for _, tt := range tests {
+		result := removeLinksSyntax(tt.input)
+		if result != tt.expected {
+			t.Errorf("removeLinksSyntax(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
