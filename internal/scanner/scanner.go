@@ -39,8 +39,9 @@ func New(config Config) *Scanner {
 
 // ScanResult contains both the tree and the list of markdown files.
 type ScanResult struct {
-	Tree  *toc.Tree
-	Files []string // Absolute paths to markdown files
+	Tree     *toc.Tree
+	Files    []string // Relative paths to markdown files
+	RootPath string   // Absolute path to root directory
 }
 
 // Scan performs the directory scan and returns a tree of markdown files.
@@ -53,12 +54,18 @@ func (s *Scanner) Scan() (*toc.Tree, error) {
 }
 
 // GetMarkdownFiles returns a slice of all markdown file paths found.
+// Returns absolute paths for backward compatibility.
 func (s *Scanner) GetMarkdownFiles() ([]string, error) {
 	result, err := s.ScanWithFiles()
 	if err != nil {
 		return nil, err
 	}
-	return result.Files, nil
+	// Convert relative paths to absolute for backward compatibility
+	absPaths := make([]string, len(result.Files))
+	for i, relPath := range result.Files {
+		absPaths[i] = filepath.Join(result.RootPath, relPath)
+	}
+	return absPaths, nil
 }
 
 // ScanWithFiles performs a single directory walk and returns both the tree
@@ -115,7 +122,7 @@ func (s *Scanner) ScanWithFiles() (*ScanResult, error) {
 			}
 		} else if isMarkdownFile(path) {
 			tree.AddFile(relPath)
-			files = append(files, path)
+			files = append(files, relPath)
 		}
 
 		return nil
@@ -126,7 +133,7 @@ func (s *Scanner) ScanWithFiles() (*ScanResult, error) {
 	}
 
 	tree.Sort()
-	return &ScanResult{Tree: tree, Files: files}, nil
+	return &ScanResult{Tree: tree, Files: files, RootPath: s.config.RootPath}, nil
 }
 
 // shouldIgnore checks if a path should be ignored based on patterns.

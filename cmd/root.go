@@ -107,7 +107,7 @@ func runToc(cmd *cobra.Command, args []string) error {
 	// Extract summaries if requested
 	summaries := make(map[string]string)
 	if includeSummary {
-		summaries = extractSummaries(result.Files, absPath, summaryChars, singleThreaded)
+		summaries = extractSummaries(result.Files, result.RootPath, summaryChars, singleThreaded)
 	}
 
 	// Generate ToC
@@ -134,26 +134,32 @@ func runToc(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func extractSummaries(files []string, rootPath string, maxChars int, sequential bool) map[string]string {
-	if len(files) == 0 {
+func extractSummaries(relPaths []string, rootPath string, maxChars int, sequential bool) map[string]string {
+	if len(relPaths) == 0 {
 		return make(map[string]string)
 	}
 
-	// Create jobs
-	jobs := make([]worker.Job, len(files))
-	for i, file := range files {
+	// Create jobs with relative paths (used as keys)
+	// Store absolute path in Data for file reading
+	type jobData struct {
+		maxChars int
+		absPath  string
+	}
+
+	jobs := make([]worker.Job, len(relPaths))
+	for i, relPath := range relPaths {
 		jobs[i] = worker.Job{
-			FilePath: file,
-			Data:     maxChars,
+			FilePath: relPath, // Relative path used as key
+			Data:     jobData{maxChars: maxChars, absPath: filepath.Join(rootPath, relPath)},
 		}
 	}
 
 	// Process function
 	processFunc := func(job worker.Job) worker.Result {
-		maxChars := job.Data.(int)
-		summary, err := parser.ExtractSummary(job.FilePath, maxChars)
+		data := job.Data.(jobData)
+		summary, err := parser.ExtractSummary(data.absPath, data.maxChars)
 		return worker.Result{
-			FilePath: job.FilePath,
+			FilePath: job.FilePath, // Return relative path as key
 			Summary:  summary,
 			Error:    err,
 		}
@@ -164,18 +170,15 @@ func extractSummaries(files []string, rootPath string, maxChars int, sequential 
 	if sequential {
 		results = worker.ProcessSequential(jobs, processFunc)
 	} else {
-		numWorkers := min(runtime.NumCPU(), len(files))
+		numWorkers := min(runtime.NumCPU(), len(relPaths))
 		results = worker.ProcessAll(jobs, numWorkers, processFunc)
 	}
 
-	// Convert to relative paths
+	// Already keyed by relative path, just filter and convert
 	summaries := make(map[string]string)
-	for filePath, result := range results {
+	for relPath, result := range results {
 		if result.Error == nil && result.Summary != "" {
-			relPath, err := filepath.Rel(rootPath, filePath)
-			if err == nil {
-				summaries[relPath] = result.Summary
-			}
+			summaries[relPath] = result.Summary
 		}
 	}
 
