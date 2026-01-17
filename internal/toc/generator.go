@@ -7,7 +7,6 @@ import (
 
 const (
 	// ASCII tree characters
-	treeVertical   = "│"
 	treeBranch     = "├──"
 	treeLastBranch = "└──"
 	treeSpace      = "    "
@@ -62,63 +61,36 @@ func (g *Generator) generateASCII(tree *Tree) string {
 	sb.WriteString(g.config.Title)
 	sb.WriteString("\n\n")
 
-	// Track the prefix for each depth level
-	// This determines whether to show │ or space for each level
-	prefixes := make([]string, 0)
+	// Track which levels have more siblings coming (for drawing │ vs space)
+	// isLastAtLevel[i] = true means level i's parent was the last child
+	isLastAtLevel := make([]bool, 0)
 
 	tree.Walk(func(node *Node, depth int, isLast bool) {
-		// Adjust prefixes slice to current depth
-		for len(prefixes) > depth {
-			prefixes = prefixes[:len(prefixes)-1]
+		// Trim to current depth
+		if len(isLastAtLevel) > depth {
+			isLastAtLevel = isLastAtLevel[:depth]
 		}
 
-		// Build the line prefix
-		var linePrefix string
-		for _, p := range prefixes {
-			linePrefix += p
-		}
+		// Build prefix from ancestor information
+		linePrefix := buildPrefix(isLastAtLevel, isLast)
 
-		// Add branch indicator
-		if isLast {
-			linePrefix += treeLastBranch + " "
-		} else {
-			linePrefix += treeBranch + " "
-		}
-
-		// Write the line
+		// Write the entry
 		sb.WriteString(linePrefix)
 
 		if node.IsDir {
-			// Directory: just show name with trailing /
 			sb.WriteString(node.Name)
 			sb.WriteString("/\n")
 		} else {
-			// File: show as markdown link
-			sb.WriteString("[")
-			sb.WriteString(node.Name)
-			sb.WriteString("](")
-			sb.WriteString(node.Path)
-			sb.WriteString(")\n")
+			fmt.Fprintf(&sb, "[%s](%s)\n", node.Name, node.Path)
 
-			// Add summary if enabled and available
+			// Add summary if enabled
 			if g.config.IncludeSummary {
 				summary := node.Summary
 				if summary == "" {
 					summary = g.config.Summaries[node.Path]
 				}
-
 				if summary != "" {
-					// Build summary prefix (same as line but with continuation)
-					var summaryPrefix string
-					for _, p := range prefixes {
-						summaryPrefix += p
-					}
-					if isLast {
-						summaryPrefix += treeSpace
-					} else {
-						summaryPrefix += treePipe
-					}
-
+					summaryPrefix := buildContinuationPrefix(isLastAtLevel, isLast)
 					sb.WriteString(summaryPrefix)
 					sb.WriteString("> ")
 					sb.WriteString(summary)
@@ -127,16 +99,49 @@ func (g *Generator) generateASCII(tree *Tree) string {
 			}
 		}
 
-		// Update prefixes for children
+		// Track this level for children
 		if node.IsDir {
-			if isLast {
-				prefixes = append(prefixes, treeSpace)
-			} else {
-				prefixes = append(prefixes, treePipe)
-			}
+			isLastAtLevel = append(isLastAtLevel, isLast)
 		}
 	})
 
+	return sb.String()
+}
+
+// buildPrefix constructs the tree prefix for a node.
+func buildPrefix(isLastAtLevel []bool, isLast bool) string {
+	var sb strings.Builder
+	for _, wasLast := range isLastAtLevel {
+		if wasLast {
+			sb.WriteString(treeSpace)
+		} else {
+			sb.WriteString(treePipe)
+		}
+	}
+	if isLast {
+		sb.WriteString(treeLastBranch)
+	} else {
+		sb.WriteString(treeBranch)
+	}
+	sb.WriteString(" ")
+	return sb.String()
+}
+
+// buildContinuationPrefix constructs the prefix for continuation lines (like summaries).
+func buildContinuationPrefix(isLastAtLevel []bool, isLast bool) string {
+	var sb strings.Builder
+	for _, wasLast := range isLastAtLevel {
+		if wasLast {
+			sb.WriteString(treeSpace)
+		} else {
+			sb.WriteString(treePipe)
+		}
+	}
+	if isLast {
+		sb.WriteString(treeSpace)
+	} else {
+		sb.WriteString(treePipe)
+	}
 	return sb.String()
 }
 
