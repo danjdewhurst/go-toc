@@ -222,3 +222,97 @@ func TestGenerateSlug(t *testing.T) {
 		}
 	}
 }
+
+func TestSetSummary(t *testing.T) {
+	gen := NewGenerator(GeneratorConfig{
+		Title:          "Test",
+		IncludeSummary: true,
+	})
+
+	// Set a summary
+	gen.SetSummary("README.md", "This is the readme summary.")
+
+	// Verify it was set
+	tree := NewTree("project")
+	tree.AddFile("README.md")
+	tree.Sort()
+
+	output := gen.Generate(tree)
+
+	if !strings.Contains(output, "This is the readme summary.") {
+		t.Error("output should contain the set summary")
+	}
+}
+
+func TestSetSummaryOverwrite(t *testing.T) {
+	gen := NewGenerator(GeneratorConfig{
+		Title:          "Test",
+		IncludeSummary: true,
+	})
+
+	// Set a summary then overwrite it
+	gen.SetSummary("README.md", "Original summary")
+	gen.SetSummary("README.md", "Updated summary")
+
+	tree := NewTree("project")
+	tree.AddFile("README.md")
+	tree.Sort()
+
+	output := gen.Generate(tree)
+
+	if strings.Contains(output, "Original summary") {
+		t.Error("output should not contain original summary after overwrite")
+	}
+	if !strings.Contains(output, "Updated summary") {
+		t.Error("output should contain updated summary")
+	}
+}
+
+func TestFormatTree(t *testing.T) {
+	tree := NewTree("project")
+	tree.AddFile("README.md")
+	tree.AddFile("docs/guide.md")
+	tree.Sort()
+
+	gen := NewGenerator(GeneratorConfig{
+		Title: "My Custom Title",
+	})
+
+	output := gen.FormatTree(tree)
+
+	// Should NOT contain the title
+	if strings.Contains(output, "# My Custom Title") {
+		t.Error("FormatTree output should not contain title")
+	}
+
+	// Should contain the file links
+	if !strings.Contains(output, "[README.md](README.md)") {
+		t.Error("FormatTree output should contain README link")
+	}
+	if !strings.Contains(output, "[guide.md](docs/guide.md)") {
+		t.Error("FormatTree output should contain guide link")
+	}
+}
+
+func TestFormatTreeFancy(t *testing.T) {
+	tree := NewTree("project")
+	tree.AddFile("README.md")
+	tree.Sort()
+
+	gen := NewGenerator(GeneratorConfig{
+		Title: "Fancy Title",
+		Fancy: true,
+	})
+
+	output := gen.FormatTree(tree)
+
+	// Should NOT contain the title with emoji
+	if strings.Contains(output, "# Fancy Title 📚") {
+		t.Error("FormatTree output should not contain title")
+	}
+
+	// Should contain the file emoji and link
+	if !strings.Contains(output, "📄") {
+		t.Error("FormatTree fancy output should contain file emoji")
+	}
+}

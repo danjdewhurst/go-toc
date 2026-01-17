@@ -199,3 +199,70 @@ func TestRemoveLinksSyntaxWithEscapes(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractSummaryNonExistentFile(t *testing.T) {
+	_, err := ExtractSummary("/nonexistent/path/to/file.md", 100)
+	if err == nil {
+		t.Error("expected error for non-existent file")
+	}
+}
+
+func TestExtractSummaryDirectory(t *testing.T) {
+	// Create a temp directory
+	tmpDir, err := os.MkdirTemp("", "go-toc-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Try to extract summary from a directory (should fail)
+	_, err = ExtractSummary(tmpDir, 100)
+	if err == nil {
+		t.Error("expected error when reading directory as file")
+	}
+}
+
+func TestRemoveFormattingMarkers(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"**bold** text", "bold text"},
+		{"*italic* text", "italic text"},
+		{"__underline__ text", "underline text"},
+		{"_emphasis_ text", "emphasis text"},
+		{"***bold italic***", "bold italic"},
+		{"____double____", "double"},
+		{"normal text", "normal text"},
+		{"", ""},
+		{"*", ""},
+		{"**", ""},
+	}
+
+	for _, tt := range tests {
+		result := removeFormattingMarkers(tt.input)
+		if result != tt.expected {
+			t.Errorf("removeFormattingMarkers(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestRemoveImagesSyntax(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"![alt text](image.png)", "alt text"},
+		{"![](empty.png)", ""},
+		{"text ![image](url) more", "text image more"},
+		{"![nested ![inner]](url)", "nested ![inner]"},
+		{"no images here", "no images here"},
+	}
+
+	for _, tt := range tests {
+		result := removeImagesSyntax(tt.input)
+		if result != tt.expected {
+			t.Errorf("removeImagesSyntax(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}

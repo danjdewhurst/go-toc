@@ -444,43 +444,6 @@ func TestScannerMarkdownExtension(t *testing.T) {
 	}
 }
 
-func TestContainsMarkdown(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "go-toc-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Directory with markdown
-	createTestDir(t, tmpDir, "with-md")
-	createTestFile(t, tmpDir, "with-md/doc.md", "# Doc")
-
-	// Directory without markdown
-	createTestDir(t, tmpDir, "no-md")
-	createTestFile(t, tmpDir, "no-md/main.go", "package main")
-
-	// Empty directory
-	createTestDir(t, tmpDir, "empty")
-
-	config := Config{
-		RootPath: tmpDir,
-	}
-
-	s := New(config)
-
-	if !s.containsMarkdown(filepath.Join(tmpDir, "with-md")) {
-		t.Error("with-md should contain markdown")
-	}
-
-	if s.containsMarkdown(filepath.Join(tmpDir, "no-md")) {
-		t.Error("no-md should not contain markdown")
-	}
-
-	if s.containsMarkdown(filepath.Join(tmpDir, "empty")) {
-		t.Error("empty should not contain markdown")
-	}
-}
-
 func TestScannerNestedGitignore(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "go-toc-test")
 	if err != nil {
@@ -528,5 +491,72 @@ func TestScannerNestedGitignore(t *testing.T) {
 	}
 	if !foundIncluded {
 		t.Error("included.md should have been found")
+	}
+}
+
+func TestScannerSymlinkValidation(t *testing.T) {
+	// Create temp directory for root
+	tmpDir, err := os.MkdirTemp("", "go-toc-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create temp directory for external files (outside root)
+	externalDir, err := os.MkdirTemp("", "go-toc-external")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(externalDir)
+
+	// Create a markdown file inside the root
+	createTestFile(t, tmpDir, "internal.md", "# Internal file")
+
+	// Create a markdown file outside the root
+	externalFile := filepath.Join(externalDir, "external.md")
+	if err := os.WriteFile(externalFile, []byte("# External file"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a symlink inside root pointing to internal file (should be included)
+	internalSymlink := filepath.Join(tmpDir, "internal-link.md")
+	if err := os.Symlink(filepath.Join(tmpDir, "internal.md"), internalSymlink); err != nil {
+		t.Skipf("Cannot create symlinks on this system: %v", err)
+	}
+
+	// Create a symlink inside root pointing to external file (should be excluded)
+	externalSymlink := filepath.Join(tmpDir, "external-link.md")
+	if err := os.Symlink(externalFile, externalSymlink); err != nil {
+		t.Skipf("Cannot create symlinks on this system: %v", err)
+	}
+
+	config := Config{
+		RootPath: tmpDir,
+	}
+
+	s := New(config)
+	result, err := s.ScanWithFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should include internal.md but not external-link.md
+	foundInternal := false
+	foundExternalLink := false
+	for _, f := range result.Files {
+		name := filepath.Base(f)
+		if name == "internal.md" {
+			foundInternal = true
+		}
+		if name == "external-link.md" {
+			foundExternalLink = true
+		}
+	}
+
+	if !foundInternal {
+		t.Error("internal.md should have been found")
+	}
+	if foundExternalLink {
+		t.Error("external-link.md (symlink to external file) should have been excluded")
 	}
 }

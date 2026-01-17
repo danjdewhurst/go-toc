@@ -104,6 +104,11 @@ func runToc(cmd *cobra.Command, args []string) error {
 	}
 	tree := result.Tree
 
+	// Log any gitignore parsing errors
+	for _, gitErr := range result.GitignoreErrors {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to parse %s: %v\n", gitErr.Path, gitErr.Err)
+	}
+
 	// Extract summaries if requested
 	summaries := make(map[string]string)
 	if includeSummary {
@@ -156,7 +161,13 @@ func extractSummaries(relPaths []string, rootPath string, maxChars int, sequenti
 
 	// Process function
 	processFunc := func(job worker.Job) worker.Result {
-		data := job.Data.(jobData)
+		data, ok := job.Data.(jobData)
+		if !ok {
+			return worker.Result{
+				FilePath: job.FilePath,
+				Error:    fmt.Errorf("invalid job data type"),
+			}
+		}
 		summary, err := parser.ExtractSummary(data.absPath, data.maxChars)
 		return worker.Result{
 			FilePath: job.FilePath, // Return relative path as key

@@ -12,6 +12,13 @@ import (
 type GitignoreManager struct {
 	rootPath string
 	matchers map[string]*ignore.GitIgnore // Map of directory path to matcher
+	errors   []GitignoreError             // Collected errors from gitignore parsing
+}
+
+// GitignoreError represents an error encountered while parsing a .gitignore file.
+type GitignoreError struct {
+	Path string
+	Err  error
 }
 
 // NewGitignoreManager creates a new gitignore manager for the given root path.
@@ -19,6 +26,7 @@ func NewGitignoreManager(rootPath string) *GitignoreManager {
 	mgr := &GitignoreManager{
 		rootPath: rootPath,
 		matchers: make(map[string]*ignore.GitIgnore),
+		errors:   make([]GitignoreError, 0),
 	}
 
 	// Load root .gitignore
@@ -27,15 +35,26 @@ func NewGitignoreManager(rootPath string) *GitignoreManager {
 	return mgr
 }
 
+// Errors returns any errors encountered while parsing .gitignore files.
+func (m *GitignoreManager) Errors() []GitignoreError {
+	return m.errors
+}
+
 // loadGitignore loads a .gitignore file from the specified directory.
 func (m *GitignoreManager) loadGitignore(dirPath string) {
 	gitignorePath := filepath.Join(dirPath, ".gitignore")
 
 	if _, err := os.Stat(gitignorePath); err == nil {
 		matcher, err := ignore.CompileIgnoreFile(gitignorePath)
-		if err == nil {
-			m.matchers[dirPath] = matcher
+		if err != nil {
+			// Record the error for later reporting
+			m.errors = append(m.errors, GitignoreError{
+				Path: gitignorePath,
+				Err:  err,
+			})
+			return
 		}
+		m.matchers[dirPath] = matcher
 	}
 }
 

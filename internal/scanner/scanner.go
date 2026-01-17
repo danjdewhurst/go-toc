@@ -39,9 +39,10 @@ func New(config Config) *Scanner {
 
 // ScanResult contains both the tree and the list of markdown files.
 type ScanResult struct {
-	Tree     *toc.Tree
-	Files    []string // Relative paths to markdown files
-	RootPath string   // Absolute path to root directory
+	Tree            *toc.Tree
+	Files           []string         // Relative paths to markdown files
+	RootPath        string           // Absolute path to root directory
+	GitignoreErrors []GitignoreError // Errors encountered while parsing .gitignore files
 }
 
 // Scan performs the directory scan and returns a tree of markdown files.
@@ -75,7 +76,13 @@ func (s *Scanner) ScanWithFiles() (*ScanResult, error) {
 	tree := toc.NewTree(filepath.Base(s.config.RootPath))
 	var files []string
 
-	err := filepath.WalkDir(s.config.RootPath, func(path string, d os.DirEntry, err error) error {
+	// Resolve root path for symlink validation
+	rootReal, err := filepath.EvalSymlinks(s.config.RootPath)
+	if err != nil {
+		rootReal = s.config.RootPath // Fall back if root can't be resolved
+	}
+
+	err = filepath.WalkDir(s.config.RootPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -101,6 +108,25 @@ func (s *Scanner) ScanWithFiles() (*ScanResult, error) {
 			return nil
 		}
 
+		// Check for symlinks pointing outside root directory
+		if d.Type()&os.ModeSymlink != 0 {
+			realPath, err := filepath.EvalSymlinks(path)
+			if err != nil {
+				// Skip symlinks that can't be resolved
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			// Skip symlinks that point outside the root directory
+			if !strings.HasPrefix(realPath, rootReal) {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+		}
+
 		// Load nested .gitignore files as we traverse
 		if d.IsDir() && s.gitignoreMgr != nil {
 			s.gitignoreMgr.LoadGitignoreForDir(path)
@@ -114,13 +140,9 @@ func (s *Scanner) ScanWithFiles() (*ScanResult, error) {
 			return nil
 		}
 
-		// Process entry
-		if d.IsDir() {
-			// Only add directory if it contains markdown files
-			if s.containsMarkdown(path) {
-				tree.AddDirectory(relPath)
-			}
-		} else if isMarkdownFile(path) {
+		// Process entry - only add markdown files
+		// Parent directories are created automatically by tree.AddFile
+		if !d.IsDir() && isMarkdownFile(path) {
 			tree.AddFile(relPath)
 			files = append(files, relPath)
 		}
@@ -133,7 +155,19 @@ func (s *Scanner) ScanWithFiles() (*ScanResult, error) {
 	}
 
 	tree.Sort()
-	return &ScanResult{Tree: tree, Files: files, RootPath: s.config.RootPath}, nil
+
+	// Collect any gitignore parsing errors
+	var gitignoreErrors []GitignoreError
+	if s.gitignoreMgr != nil {
+		gitignoreErrors = s.gitignoreMgr.Errors()
+	}
+
+	return &ScanResult{
+		Tree:            tree,
+		Files:           files,
+		RootPath:        s.config.RootPath,
+		GitignoreErrors: gitignoreErrors,
+	}, nil
 }
 
 // shouldIgnore checks if a path should be ignored based on patterns.
@@ -179,39 +213,6 @@ func (s *Scanner) shouldIgnore(relPath string, isDir bool) bool {
 	}
 
 	return false
-}
-
-// containsMarkdown checks if a directory contains any markdown files.
-func (s *Scanner) containsMarkdown(dirPath string) bool {
-	hasMarkdown := false
-
-	_ = filepath.WalkDir(dirPath, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		relPath, err := filepath.Rel(s.config.RootPath, path)
-		if err != nil {
-			return err
-		}
-
-		// Skip hidden and ignored
-		if s.shouldIgnore(relPath, d.IsDir()) {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		if !d.IsDir() && isMarkdownFile(path) {
-			hasMarkdown = true
-			return filepath.SkipAll
-		}
-
-		return nil
-	})
-
-	return hasMarkdown
 }
 
 // isMarkdownFile checks if a file has a markdown extension.

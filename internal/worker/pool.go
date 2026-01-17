@@ -108,7 +108,7 @@ func ProcessAll(jobs []Job, workers int, processFunc ProcessFunc) map[string]Res
 	}()
 
 	// Collect results - loop exits when results channel is closed
-	results := make(map[string]Result)
+	results := make(map[string]Result, len(jobs))
 	for result := range pool.results {
 		results[result.FilePath] = result
 	}
@@ -124,7 +124,7 @@ func ProcessSequential(jobs []Job, processFunc ProcessFunc) map[string]Result {
 // ProcessSequentialWithContext processes jobs sequentially with context support.
 // Returns partial results if context is canceled.
 func ProcessSequentialWithContext(ctx context.Context, jobs []Job, processFunc ProcessFunc) map[string]Result {
-	results := make(map[string]Result)
+	results := make(map[string]Result, len(jobs))
 
 	for _, job := range jobs {
 		select {
@@ -207,7 +207,7 @@ func ProcessAllWithContext(ctx context.Context, jobs []Job, workers int, process
 	}()
 
 	// Collect results
-	results := make(map[string]Result)
+	results := make(map[string]Result, len(jobs))
 	for result := range resultsChan {
 		results[result.FilePath] = result
 	}

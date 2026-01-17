@@ -8,26 +8,29 @@ import (
 
 // Node represents a file or directory in the tree structure.
 type Node struct {
-	Name     string  // File or directory name
-	Path     string  // Relative path from root
-	IsDir    bool    // True if this is a directory
-	Summary  string  // First paragraph summary (for markdown files)
-	Children []*Node // Child nodes (for directories)
+	Name       string           // File or directory name
+	Path       string           // Relative path from root
+	IsDir      bool             // True if this is a directory
+	Summary    string           // First paragraph summary (for markdown files)
+	Children   []*Node          // Child nodes (for directories)
+	childIndex map[string]*Node // Fast lookup of children by name
 }
 
 // NewNode creates a new tree node.
 func NewNode(name, path string, isDir bool) *Node {
 	return &Node{
-		Name:     name,
-		Path:     path,
-		IsDir:    isDir,
-		Children: make([]*Node, 0),
+		Name:       name,
+		Path:       path,
+		IsDir:      isDir,
+		Children:   make([]*Node, 0),
+		childIndex: make(map[string]*Node),
 	}
 }
 
 // AddChild adds a child node and returns it.
 func (n *Node) AddChild(child *Node) *Node {
 	n.Children = append(n.Children, child)
+	n.childIndex[child.Name] = child
 	return child
 }
 
@@ -50,6 +53,7 @@ func (n *Node) Sort() {
 }
 
 // FindOrCreatePath finds or creates the path in the tree, returning the final node.
+// Uses O(1) map lookup for children instead of O(n) linear search.
 func (n *Node) FindOrCreatePath(relPath string, isDir bool) *Node {
 	if relPath == "" || relPath == "." {
 		return n
@@ -63,16 +67,10 @@ func (n *Node) FindOrCreatePath(relPath string, isDir bool) *Node {
 			continue
 		}
 
-		found := false
-		for _, child := range current.Children {
-			if child.Name == part {
-				current = child
-				found = true
-				break
-			}
-		}
-
-		if !found {
+		// O(1) map lookup instead of O(n) linear search
+		if child, exists := current.childIndex[part]; exists {
+			current = child
+		} else {
 			// Determine if this part is a directory
 			// It's a directory if it's not the last part, or if isDir is true for the last part
 			partIsDir := i < len(parts)-1 || isDir
