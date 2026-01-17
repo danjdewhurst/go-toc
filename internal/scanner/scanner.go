@@ -37,75 +37,38 @@ func New(config Config) *Scanner {
 	return s
 }
 
+// ScanResult contains both the tree and the list of markdown files.
+type ScanResult struct {
+	Tree  *toc.Tree
+	Files []string // Absolute paths to markdown files
+}
+
 // Scan performs the directory scan and returns a tree of markdown files.
 func (s *Scanner) Scan() (*toc.Tree, error) {
-	tree := toc.NewTree(filepath.Base(s.config.RootPath))
-
-	err := s.walkDirectory(s.config.RootPath, 0, tree)
+	result, err := s.ScanWithFiles()
 	if err != nil {
 		return nil, err
 	}
-
-	tree.Sort()
-	return tree, nil
+	return result.Tree, nil
 }
 
 // GetMarkdownFiles returns a slice of all markdown file paths found.
 func (s *Scanner) GetMarkdownFiles() ([]string, error) {
-	var files []string
-
-	err := s.walkDirectory(s.config.RootPath, 0, nil)
+	result, err := s.ScanWithFiles()
 	if err != nil {
 		return nil, err
 	}
-
-	// Re-walk to collect files
-	err = filepath.WalkDir(s.config.RootPath, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		relPath, err := filepath.Rel(s.config.RootPath, path)
-		if err != nil {
-			return err
-		}
-
-		if relPath == "." {
-			return nil
-		}
-
-		// Check depth
-		if s.config.MaxDepth > 0 {
-			depth := strings.Count(relPath, string(os.PathSeparator)) + 1
-			if depth > s.config.MaxDepth {
-				if d.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-		}
-
-		// Check if ignored
-		if s.shouldIgnore(relPath, d.IsDir()) {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		// Collect markdown files
-		if !d.IsDir() && isMarkdownFile(path) {
-			files = append(files, path)
-		}
-
-		return nil
-	})
-
-	return files, err
+	return result.Files, nil
 }
 
-func (s *Scanner) walkDirectory(root string, currentDepth int, tree *toc.Tree) error {
-	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+// ScanWithFiles performs a single directory walk and returns both the tree
+// and list of markdown files. This is more efficient than calling Scan()
+// and GetMarkdownFiles() separately.
+func (s *Scanner) ScanWithFiles() (*ScanResult, error) {
+	tree := toc.NewTree(filepath.Base(s.config.RootPath))
+	var files []string
+
+	err := filepath.WalkDir(s.config.RootPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -139,20 +102,26 @@ func (s *Scanner) walkDirectory(root string, currentDepth int, tree *toc.Tree) e
 			return nil
 		}
 
-		// Add to tree if it's a markdown file or directory containing markdown
-		if tree != nil {
-			if d.IsDir() {
-				// Only add directory if it contains markdown files
-				if s.containsMarkdown(path) {
-					tree.AddDirectory(relPath)
-				}
-			} else if isMarkdownFile(path) {
-				tree.AddFile(relPath)
+		// Process entry
+		if d.IsDir() {
+			// Only add directory if it contains markdown files
+			if s.containsMarkdown(path) {
+				tree.AddDirectory(relPath)
 			}
+		} else if isMarkdownFile(path) {
+			tree.AddFile(relPath)
+			files = append(files, path)
 		}
 
 		return nil
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	tree.Sort()
+	return &ScanResult{Tree: tree, Files: files}, nil
 }
 
 // shouldIgnore checks if a path should be ignored based on patterns.

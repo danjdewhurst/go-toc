@@ -97,21 +97,17 @@ func runToc(cmd *cobra.Command, args []string) error {
 
 	s := scanner.New(scannerConfig)
 
-	// Scan directory
-	tree, err := s.Scan()
+	// Scan directory (single walk gets both tree and files)
+	result, err := s.ScanWithFiles()
 	if err != nil {
 		return fmt.Errorf("scan failed: %w", err)
 	}
+	tree := result.Tree
 
 	// Extract summaries if requested
 	summaries := make(map[string]string)
 	if includeSummary {
-		files, err := s.GetMarkdownFiles()
-		if err != nil {
-			return fmt.Errorf("failed to get markdown files: %w", err)
-		}
-
-		summaries = extractSummaries(files, absPath, summaryChars, singleThreaded)
+		summaries = extractSummaries(result.Files, absPath, summaryChars, singleThreaded)
 	}
 
 	// Generate ToC
@@ -168,10 +164,7 @@ func extractSummaries(files []string, rootPath string, maxChars int, sequential 
 	if sequential {
 		results = worker.ProcessSequential(jobs, processFunc)
 	} else {
-		numWorkers := runtime.NumCPU()
-		if numWorkers > len(files) {
-			numWorkers = len(files)
-		}
+		numWorkers := min(runtime.NumCPU(), len(files))
 		results = worker.ProcessAll(jobs, numWorkers, processFunc)
 	}
 
