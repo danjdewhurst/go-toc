@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"sync"
 )
 
@@ -117,10 +118,97 @@ func ProcessAll(jobs []Job, workers int, processFunc ProcessFunc) map[string]Res
 
 // ProcessSequential processes jobs sequentially (single-threaded).
 func ProcessSequential(jobs []Job, processFunc ProcessFunc) map[string]Result {
+	return ProcessSequentialWithContext(context.Background(), jobs, processFunc)
+}
+
+// ProcessSequentialWithContext processes jobs sequentially with context support.
+// Returns partial results if context is canceled.
+func ProcessSequentialWithContext(ctx context.Context, jobs []Job, processFunc ProcessFunc) map[string]Result {
 	results := make(map[string]Result)
 
 	for _, job := range jobs {
-		result := processFunc(job)
+		select {
+		case <-ctx.Done():
+			return results
+		default:
+			result := processFunc(job)
+			results[result.FilePath] = result
+		}
+	}
+
+	return results
+}
+
+// ProcessAllWithContext processes all jobs concurrently with context support.
+// Returns partial results if context is canceled.
+func ProcessAllWithContext(ctx context.Context, jobs []Job, workers int, processFunc ProcessFunc) map[string]Result {
+	if len(jobs) == 0 {
+		return make(map[string]Result)
+	}
+
+	if workers <= 0 {
+		workers = 1
+	}
+
+	jobsChan := make(chan Job, workers*2)
+	resultsChan := make(chan Result, workers*2)
+
+	var wg sync.WaitGroup
+
+	// Start workers
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					// Drain remaining jobs without processing
+					for range jobsChan {
+					}
+					return
+				case job, ok := <-jobsChan:
+					if !ok {
+						return
+					}
+					// Check context again before processing
+					select {
+					case <-ctx.Done():
+						return
+					default:
+						result := processFunc(job)
+						select {
+						case resultsChan <- result:
+						case <-ctx.Done():
+							return
+						}
+					}
+				}
+			}
+		}()
+	}
+
+	// Submit jobs in a goroutine
+	go func() {
+		defer close(jobsChan)
+		for _, job := range jobs {
+			select {
+			case <-ctx.Done():
+				return
+			case jobsChan <- job:
+			}
+		}
+	}()
+
+	// Close results channel when workers are done
+	go func() {
+		wg.Wait()
+		close(resultsChan)
+	}()
+
+	// Collect results
+	results := make(map[string]Result)
+	for result := range resultsChan {
 		results[result.FilePath] = result
 	}
 

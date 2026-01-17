@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -238,4 +239,85 @@ func TestPoolDoubleClose(t *testing.T) {
 
 	pool.Close()
 	pool.Close() // Second close should be safe
+}
+
+func TestProcessAllWithContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var processed int
+	var mu sync.Mutex
+
+	jobs := make([]Job, 100)
+	for i := range jobs {
+		jobs[i] = Job{FilePath: "file.md"}
+	}
+
+	processFunc := func(job Job) Result {
+		mu.Lock()
+		processed++
+		count := processed
+		mu.Unlock()
+
+		// Cancel after processing 5 jobs
+		if count == 5 {
+			cancel()
+		}
+
+		time.Sleep(10 * time.Millisecond) // Simulate work
+		return Result{FilePath: job.FilePath, Summary: "done"}
+	}
+
+	results := ProcessAllWithContext(ctx, jobs, 2, processFunc)
+
+	// Should have partial results due to cancellation
+	if len(results) >= len(jobs) {
+		t.Errorf("expected partial results due to cancellation, got all %d", len(results))
+	}
+}
+
+func TestProcessSequentialWithContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	jobs := make([]Job, 10)
+	for i := range jobs {
+		jobs[i] = Job{FilePath: "file.md", Data: i}
+	}
+
+	processCount := 0
+	processFunc := func(job Job) Result {
+		processCount++
+		if processCount == 3 {
+			cancel()
+		}
+		return Result{FilePath: job.FilePath, Summary: "done"}
+	}
+
+	results := ProcessSequentialWithContext(ctx, jobs, processFunc)
+
+	// Should have stopped after 3 jobs (the one that called cancel still completes)
+	if len(results) > 4 {
+		t.Errorf("expected at most 4 results due to cancellation, got %d", len(results))
+	}
+}
+
+func TestProcessAllWithContextTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	jobs := make([]Job, 100)
+	for i := range jobs {
+		jobs[i] = Job{FilePath: "file.md"}
+	}
+
+	processFunc := func(job Job) Result {
+		time.Sleep(20 * time.Millisecond) // Each job takes 20ms
+		return Result{FilePath: job.FilePath, Summary: "done"}
+	}
+
+	results := ProcessAllWithContext(ctx, jobs, 2, processFunc)
+
+	// With 50ms timeout and 20ms per job with 2 workers, should process ~4-5 jobs
+	if len(results) >= len(jobs) {
+		t.Errorf("expected partial results due to timeout, got all %d", len(results))
+	}
 }
