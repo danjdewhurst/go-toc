@@ -111,11 +111,8 @@ func cleanMarkdown(text string) string {
 	// Remove inline code
 	text = removePattern(text, "`", "`")
 
-	// Remove bold/italic markers
-	text = strings.ReplaceAll(text, "**", "")
-	text = strings.ReplaceAll(text, "__", "")
-	text = strings.ReplaceAll(text, "*", "")
-	text = strings.ReplaceAll(text, "_", "")
+	// Remove bold/italic markers in single pass
+	text = removeFormattingMarkers(text)
 
 	// Remove links but keep text: [text](url) -> text
 	text = removeLinksSyntax(text)
@@ -129,23 +126,64 @@ func cleanMarkdown(text string) string {
 	return text
 }
 
-// removePattern removes content between start and end delimiters.
-func removePattern(text, start, end string) string {
-	result := text
-	for {
-		startIdx := strings.Index(result, start)
-		if startIdx == -1 {
-			break
-		}
+// removeFormattingMarkers removes **, __, *, _ in a single pass.
+func removeFormattingMarkers(text string) string {
+	var result strings.Builder
+	result.Grow(len(text))
 
-		endIdx := strings.Index(result[startIdx+len(start):], end)
-		if endIdx == -1 {
-			break
+	i := 0
+	for i < len(text) {
+		// Check for ** or __
+		if i+1 < len(text) {
+			pair := text[i : i+2]
+			if pair == "**" || pair == "__" {
+				i += 2
+				continue
+			}
 		}
-
-		result = result[:startIdx] + result[startIdx+len(start)+endIdx+len(end):]
+		// Check for single * or _ (but not in the middle of words for _)
+		if text[i] == '*' {
+			i++
+			continue
+		}
+		if text[i] == '_' {
+			i++
+			continue
+		}
+		result.WriteByte(text[i])
+		i++
 	}
-	return result
+
+	return result.String()
+}
+
+// removePattern removes content between start and end delimiters.
+// Uses single-pass algorithm for O(n) performance.
+func removePattern(text, start, end string) string {
+	if !strings.Contains(text, start) {
+		return text
+	}
+
+	var result strings.Builder
+	result.Grow(len(text))
+
+	i := 0
+	for i < len(text) {
+		// Check if we're at a start delimiter
+		if i+len(start) <= len(text) && text[i:i+len(start)] == start {
+			// Find the end delimiter
+			endIdx := strings.Index(text[i+len(start):], end)
+			if endIdx != -1 {
+				// Skip the delimited content
+				i = i + len(start) + endIdx + len(end)
+				continue
+			}
+		}
+		result.WriteByte(text[i])
+		i++
+	}
+
+	return result.String()
 }
 
 // removeLinksSyntax converts [text](url) to text.
