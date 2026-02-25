@@ -54,6 +54,9 @@ func (g *Generator) Generate(tree *Tree) string {
 }
 
 // generateASCII creates ASCII tree style output.
+// Prefixes use &nbsp; instead of plain spaces so indentation survives
+// markdown rendering, and each tree line ends with two trailing spaces
+// to produce <br> line breaks.
 func (g *Generator) generateASCII(tree *Tree) string {
 	var sb strings.Builder
 
@@ -73,7 +76,7 @@ func (g *Generator) generateASCII(tree *Tree) string {
 		}
 
 		// Build prefix from ancestor information
-		linePrefix := buildPrefix(isLastAtLevel, isLast)
+		linePrefix := mdSafePrefix(buildPrefix(isLastAtLevel, isLast))
 
 		// Write the entry
 		sb.WriteString(linePrefix)
@@ -83,12 +86,12 @@ func (g *Generator) generateASCII(tree *Tree) string {
 				fmt.Fprintf(&sb, "<a id=\"%s\"></a>", generateSlug(node.Path))
 			}
 			sb.WriteString(node.Name)
-			sb.WriteString("/\n")
+			sb.WriteString("/  \n")
 		} else {
 			if g.config.GenerateAnchors {
 				fmt.Fprintf(&sb, "<a id=\"%s\"></a>", generateSlug(node.Path))
 			}
-			fmt.Fprintf(&sb, "[%s](%s)\n", node.Name, node.Path)
+			fmt.Fprintf(&sb, "[%s](%s)  \n", node.Name, node.Path)
 
 			// Add summary if enabled
 			if g.config.IncludeSummary {
@@ -97,11 +100,11 @@ func (g *Generator) generateASCII(tree *Tree) string {
 					summary = g.config.Summaries[node.Path]
 				}
 				if summary != "" {
-					summaryPrefix := buildContinuationPrefix(isLastAtLevel, isLast)
+					summaryPrefix := mdSafePrefix(buildContinuationPrefix(isLastAtLevel, isLast))
 					sb.WriteString(summaryPrefix)
 					sb.WriteString("> ")
 					sb.WriteString(summary)
-					sb.WriteString("\n")
+					sb.WriteString("  \n")
 				}
 			}
 		}
@@ -150,6 +153,12 @@ func buildContinuationPrefix(isLastAtLevel []bool, isLast bool) string {
 		sb.WriteString(treePipe)
 	}
 	return sb.String()
+}
+
+// mdSafePrefix replaces plain spaces with &nbsp; so markdown renderers
+// preserve the tree indentation instead of collapsing whitespace.
+func mdSafePrefix(prefix string) string {
+	return strings.ReplaceAll(prefix, " ", "&nbsp;")
 }
 
 // generateFancy creates emoji-based output.

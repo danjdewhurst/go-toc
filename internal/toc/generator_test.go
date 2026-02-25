@@ -22,12 +22,12 @@ func TestGenerator(t *testing.T) {
 		t.Error("output should contain title")
 	}
 
-	// Check file links
-	if !strings.Contains(output, "[README.md](README.md)") {
-		t.Error("output should contain README link")
+	// Check file links (with trailing two-space line breaks)
+	if !strings.Contains(output, "[README.md](README.md)  \n") {
+		t.Error("output should contain README link with trailing line break")
 	}
-	if !strings.Contains(output, "[guide.md](docs/guide.md)") {
-		t.Error("output should contain guide link")
+	if !strings.Contains(output, "[guide.md](docs/guide.md)  \n") {
+		t.Error("output should contain guide link with trailing line break")
 	}
 
 	// Check tree characters
@@ -53,9 +53,9 @@ func TestGeneratorWithSummary(t *testing.T) {
 
 	output := gen.Generate(tree)
 
-	// Check summary is included
-	if !strings.Contains(output, "> This is the project overview.") {
-		t.Error("output should contain summary as blockquote")
+	// Check summary is included (with trailing two-space line break)
+	if !strings.Contains(output, "> This is the project overview.  \n") {
+		t.Error("output should contain summary as blockquote with trailing line break")
 	}
 }
 
@@ -72,12 +72,12 @@ func TestGeneratorDirectories(t *testing.T) {
 
 	output := gen.Generate(tree)
 
-	// Check directory is shown with trailing slash
-	if !strings.Contains(output, "docs/") {
-		t.Error("output should show directory with trailing slash")
+	// Check directory is shown with trailing slash and line break
+	if !strings.Contains(output, "docs/  \n") {
+		t.Error("output should show directory with trailing slash and line break")
 	}
-	if !strings.Contains(output, "api/") {
-		t.Error("output should show nested directory")
+	if !strings.Contains(output, "api/  \n") {
+		t.Error("output should show nested directory with line break")
 	}
 }
 
@@ -191,12 +191,15 @@ func TestGeneratorWithAnchors(t *testing.T) {
 
 	output := gen.Generate(tree)
 
-	// Check anchors are generated
+	// Check anchors are generated (prefix uses &nbsp; for markdown safety)
 	if !strings.Contains(output, `<a id="readme"></a>`) {
 		t.Error("output should contain anchor for README")
 	}
 	if !strings.Contains(output, `<a id="docs-api-guide"></a>`) {
 		t.Error("output should contain anchor for docs/API Guide.md")
+	}
+	if !strings.Contains(output, `<a id="docs"></a>`) {
+		t.Error("output should contain anchor for docs directory")
 	}
 }
 
@@ -239,8 +242,8 @@ func TestSetSummary(t *testing.T) {
 
 	output := gen.Generate(tree)
 
-	if !strings.Contains(output, "This is the readme summary.") {
-		t.Error("output should contain the set summary")
+	if !strings.Contains(output, "This is the readme summary.  \n") {
+		t.Error("output should contain the set summary with trailing line break")
 	}
 }
 
@@ -263,8 +266,8 @@ func TestSetSummaryOverwrite(t *testing.T) {
 	if strings.Contains(output, "Original summary") {
 		t.Error("output should not contain original summary after overwrite")
 	}
-	if !strings.Contains(output, "Updated summary") {
-		t.Error("output should contain updated summary")
+	if !strings.Contains(output, "Updated summary  \n") {
+		t.Error("output should contain updated summary with trailing line break")
 	}
 }
 
@@ -285,12 +288,52 @@ func TestFormatTree(t *testing.T) {
 		t.Error("FormatTree output should not contain title")
 	}
 
-	// Should contain the file links
-	if !strings.Contains(output, "[README.md](README.md)") {
+	// Should contain the file links (with trailing line breaks)
+	if !strings.Contains(output, "[README.md](README.md)  \n") {
 		t.Error("FormatTree output should contain README link")
 	}
-	if !strings.Contains(output, "[guide.md](docs/guide.md)") {
+	if !strings.Contains(output, "[guide.md](docs/guide.md)  \n") {
 		t.Error("FormatTree output should contain guide link")
+	}
+}
+
+func TestMdSafePrefix(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"├── ", "├──&nbsp;"},
+		{"│   ├── ", "│&nbsp;&nbsp;&nbsp;├──&nbsp;"},
+		{"    └── ", "&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;"},
+	}
+
+	for _, tt := range tests {
+		result := mdSafePrefix(tt.input)
+		if result != tt.expected {
+			t.Errorf("mdSafePrefix(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestASCIIOutputPreservesIndentation(t *testing.T) {
+	tree := NewTree("project")
+	tree.AddFile("docs/api/handlers.md")
+	tree.AddFile("docs/api/routes.md")
+	tree.Sort()
+
+	gen := NewGenerator(GeneratorConfig{
+		Title: "Test",
+	})
+
+	output := gen.Generate(tree)
+
+	// Nested prefixes should use &nbsp; instead of plain spaces
+	if !strings.Contains(output, "&nbsp;") {
+		t.Error("ASCII output should use &nbsp; for indentation in markdown")
+	}
+	// Should not contain plain space indentation in tree prefixes
+	if strings.Contains(output, "│   ") {
+		t.Error("ASCII output should not contain plain-space tree pipe indentation")
 	}
 }
 
