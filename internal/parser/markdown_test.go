@@ -62,6 +62,24 @@ func TestExtractSummary(t *testing.T) {
 			maxChars: 100,
 			expected: "",
 		},
+		{
+			name:     "skip fenced code blocks",
+			content:  "# Title\n\n```json\n{\"key\": \"value\"}\n```\n\nActual paragraph here.",
+			maxChars: 100,
+			expected: "Actual paragraph here.",
+		},
+		{
+			name:     "skip tilde code blocks",
+			content:  "# Title\n\n~~~\ncode here\n~~~\n\nReal content.",
+			maxChars: 100,
+			expected: "Real content.",
+		},
+		{
+			name:     "preserve inline code content",
+			content:  "# Title\n\nUse `commands` and `core logic` for processing.",
+			maxChars: 100,
+			expected: "Use commands and core logic for processing.",
+		},
 	}
 
 	for _, tt := range tests {
@@ -110,9 +128,9 @@ func TestCleanMarkdown(t *testing.T) {
 	}{
 		{"**bold** text", "bold text"},
 		{"*italic* text", "italic text"},
-		{"`code` here", "here"},
+		{"`code` here", "code here"},
 		{"[link text](http://url)", "link text"},
-		{"![alt text](image.png)", "!alt text"},
+		{"![alt text](image.png)", "alt text"},
 		{"  extra   spaces  ", "extra spaces"},
 	}
 
@@ -243,6 +261,26 @@ func TestRemoveFormattingMarkers(t *testing.T) {
 		result := removeFormattingMarkers(tt.input)
 		if result != tt.expected {
 			t.Errorf("removeFormattingMarkers(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestStripDelimiters(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"`code`", "code"},
+		{"`code` and `more`", "code and more"},
+		{"no delimiters", "no delimiters"},
+		{"`unclosed backtick", "`unclosed backtick"},
+		{"``", ""},
+	}
+
+	for _, tt := range tests {
+		result := stripDelimiters(tt.input, "`", "`")
+		if result != tt.expected {
+			t.Errorf("stripDelimiters(%q) = %q, want %q", tt.input, result, tt.expected)
 		}
 	}
 }

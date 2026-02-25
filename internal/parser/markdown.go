@@ -21,6 +21,7 @@ func ExtractSummary(filePath string, maxChars int) (string, error) {
 	var lines []string
 	inFrontmatter := false
 	frontmatterStart := false
+	inCodeBlock := false
 	foundContent := false
 
 	for scanner.Scan() {
@@ -48,6 +49,17 @@ func ExtractSummary(filePath string, maxChars int) (string, error) {
 			continue
 		}
 
+		// Track fenced code blocks (``` or ~~~)
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inCodeBlock = !inCodeBlock
+			continue
+		}
+
+		// Skip code block content
+		if inCodeBlock {
+			continue
+		}
+
 		// Skip empty lines at the start
 		if trimmed == "" && !foundContent {
 			continue
@@ -68,12 +80,10 @@ func ExtractSummary(filePath string, maxChars int) (string, error) {
 			continue
 		}
 
-		// Skip list items, blockquotes, and code blocks at the start
+		// Skip list items and blockquotes
 		if strings.HasPrefix(trimmed, "-") ||
 			strings.HasPrefix(trimmed, "*") ||
-			strings.HasPrefix(trimmed, ">") ||
-			strings.HasPrefix(trimmed, "`") ||
-			strings.HasPrefix(trimmed, "```") {
+			strings.HasPrefix(trimmed, ">") {
 			continue
 		}
 
@@ -108,17 +118,17 @@ func ExtractSummary(filePath string, maxChars int) (string, error) {
 
 // cleanMarkdown removes common markdown formatting from text.
 func cleanMarkdown(text string) string {
-	// Remove inline code
-	text = removePattern(text, "`", "`")
+	// Strip inline code backticks but keep the content
+	text = stripDelimiters(text, "`", "`")
 
 	// Remove bold/italic markers in single pass
 	text = removeFormattingMarkers(text)
 
+	// Remove images before links: ![alt](url) -> alt
+	text = removeImagesSyntax(text)
+
 	// Remove links but keep text: [text](url) -> text
 	text = removeLinksSyntax(text)
-
-	// Remove images: ![alt](url) -> alt
-	text = removeImagesSyntax(text)
 
 	// Clean up extra whitespace
 	text = strings.Join(strings.Fields(text), " ")
@@ -149,6 +159,34 @@ func removeFormattingMarkers(text string) string {
 		if text[i] == '_' {
 			i++
 			continue
+		}
+		result.WriteByte(text[i])
+		i++
+	}
+
+	return result.String()
+}
+
+// stripDelimiters removes start/end delimiter markers but keeps the content between them.
+// For example: stripDelimiters("`code`", "`", "`") returns "code".
+func stripDelimiters(text, start, end string) string {
+	if !strings.Contains(text, start) {
+		return text
+	}
+
+	var result strings.Builder
+	result.Grow(len(text))
+
+	i := 0
+	for i < len(text) {
+		if i+len(start) <= len(text) && text[i:i+len(start)] == start {
+			endIdx := strings.Index(text[i+len(start):], end)
+			if endIdx != -1 {
+				// Keep the content, skip the delimiters
+				result.WriteString(text[i+len(start) : i+len(start)+endIdx])
+				i = i + len(start) + endIdx + len(end)
+				continue
+			}
 		}
 		result.WriteByte(text[i])
 		i++
